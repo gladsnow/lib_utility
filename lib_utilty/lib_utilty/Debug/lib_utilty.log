@@ -1,0 +1,11 @@
+﻿  lib_utility.cpp
+e:\workspace\cppproject\lib_utility\lib_utilty\lib_utilty\lib_utility.cpp(5): error C2653: 'lib_utility': is not a class or namespace name
+e:\workspace\cppproject\lib_utility\lib_utilty\lib_utilty\lib_utility.cpp(6): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+e:\workspace\cppproject\lib_utility\lib_utilty\lib_utilty\lib_utility.cpp(7): warning C4508: 'lib_utility': function should return a value; 'void' return type assumed
+e:\workspace\cppproject\lib_utility\lib_utilty\lib_utilty\lib_utility.cpp(10): error C2523: 'lib_utility::~lib_utility': destructor tag mismatch
+e:\workspace\cppproject\lib_utility\lib_utilty\lib_utilty\lib_utility.cpp(10): error C2510: 'lib_utility': left of '::' must be a class/struct/union
+e:\workspace\cppproject\lib_utility\lib_utilty\lib_utilty\lib_utility.cpp(11): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+e:\workspace\cppproject\lib_utility\lib_utilty\lib_utilty\lib_utility.cpp(11): error C2084: function 'int lib_utility(void)' already has a body
+  e:\workspace\cppproject\lib_utility\lib_utilty\lib_utilty\lib_utility.cpp(5): note: see previous definition of 'lib_utility'
+  main.cpp
+  Generating Code...
