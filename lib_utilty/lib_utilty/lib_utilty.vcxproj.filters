@@ -18,18 +18,12 @@
     <ClInclude Include="lib_utility.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="timer_wheel.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lib_utility.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="timer_wheel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

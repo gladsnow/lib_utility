@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <vector>
 #include <list>
+#include <map>
 #endif
 
 namespace utility {
@@ -181,7 +182,7 @@ class SystemTime
 public:
 	SystemTime();
 	~SystemTime();
-	UINT64 GetCurrentMilliseconds();
+	unsigned long long GetCurrentMilliseconds();
 private:
 	DOUBLE frequency_;
 };
@@ -335,14 +336,14 @@ private:
 class TimerNotify
 {
 public:
-	TimerNotify();
-	virtual ~TimerNotify();
-	virtual void OnTimerNotify(int timer_id) = 0;
+	TimerNotify() {};
+	virtual ~TimerNotify() {};
+	virtual void OnTimerNotify() = 0;
 	
 };
 
 #define GRANULARITY 10 //10ms
-#define TIMER_WHEEL_NUM 5 //5级时间轮
+//#define TIMER_WHEEL_NUM 5 //5级时间轮
 #define WHEEL_BIT1	8	
 #define WHEEL_BIT2	6
 #define WHEEL_SIZE1 (1 << WHEEL_BIT1)	//第1级时间轮的格数
@@ -350,18 +351,35 @@ public:
 #define WHEEL_MASK1 (WHEEL_SIZE1 - 1)
 #define WHEEL_MASK2 (WHEEL_SIZE2 - 1)
 #define OFFSET(N) (WHEEL_SIZE1 + (N) * WHEEL_SIZE2)
-#define INDEX (N,M) ((N >> (WHEEL_BIT1 + (M)*WHEEL_BIT2))& WHEEL_MASK2)
+#define INDEX(N,M) ((N >> (WHEEL_BIT1 + (M)*WHEEL_BIT2))& WHEEL_MASK2)
+
+class TimerManager;
 
 class Timer
 {
 public:
-	Timer();
+	enum TimerType { ONCE, CIRCLE };
+
+	Timer(TimerManager& manager);
 	~Timer();
-	UINT32 GeIntervalTime();
+	int StartTimer(TimerNotify* timer_notify, unsigned interval, TimerType timeType = CIRCLE);
+	int StopTimer();
+
+	unsigned long long GetExpiredTime();
+	void SetVectorIndex(int vect_index);
+	int GetVectorIndex(void);
+
+	std::list<Timer*>::iterator itr_;
+	void HandleTask(unsigned long long current_time);
 
 private:
-	UINT32 interval_time_;
-
+	unsigned interval_time_;
+	unsigned long long expires_;
+	int vect_index_;
+	TimerNotify* timer_notify_;
+	TimerType timer_type_;
+	TimerManager& timer_manager_;
+	utility::SystemTime sys_time_;
 
 };
 
@@ -371,15 +389,15 @@ public:
 	TimerManager();
 	~TimerManager();
 
-	BOOL AddTimer(Timer* timer);
-	void RemoveTimer(int timer_id);
-	void Cascade(int offset, int index) {};
-
+	void AddTimer(Timer* timer);
+	void RemoveTimer(Timer* timer);
+	int Cascade(int offset, int index);
+	void DetectTimers(void);
 private:
 	typedef std::list<Timer*> TIMER_LIST;
-	std::vector<TIMER_LIST> timer_wheel[TIMER_WHEEL_NUM];
+	std::vector<TIMER_LIST> timer_wheel_;
 	utility::SystemTime sys_time_;
-	UINT64 check_time_;
+	unsigned long long check_time_;
 };
 
 //

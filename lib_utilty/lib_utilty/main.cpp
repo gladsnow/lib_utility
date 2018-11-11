@@ -81,7 +81,17 @@ private:
 #include <iostream>
 #include <thread>
 #include <chrono>
-#include "timer_wheel.h"
+//#include "timer_wheel.h"
+#include "lib_utility.h"
+
+class OnNotify : public utility::TimerNotify
+{
+public:
+	OnNotify(){}
+	~OnNotify() {}
+
+	void OnTimerNotify() { std::cout << "OnTimerNotify" << std::endl; }
+};
 
 void TimerHandler()
 {
@@ -90,10 +100,10 @@ void TimerHandler()
 
 int main()
 {
-	TimerManager tm;
-	Timer t(tm);
-	t.Start(&TimerHandler, 2000);
-	utility::Time time;
+	utility::TimerManager tm;
+	utility::Timer t(tm);
+	utility::TimerNotify* timer_notify = new OnNotify();
+	t.StartTimer(timer_notify, 3000);
 
 	while (true)
 	{

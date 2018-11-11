@@ -116,12 +116,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="lib_utility.h" />
-    <ClInclude Include="timer_wheel.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lib_utility.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="timer_wheel.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
