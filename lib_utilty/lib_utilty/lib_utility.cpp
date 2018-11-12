@@ -1,5 +1,6 @@
 #include "lib_utility.h"
 #include <chrono>
+#include <iostream>
 namespace utility {
 	CommonMutex::CommonMutex(std::string mutex_name)
 	{
@@ -173,8 +174,7 @@ namespace utility {
 		return unsigned long long((fc.QuadPart) / (frequency_ /1000));
 	}
 
-	Timer::Timer(TimerManager& manager)
-		:timer_manager_(manager)
+	TimerTask::TimerTask()
 	{
 		interval_time_ = 0;
 		vect_index_ = -1;
@@ -183,7 +183,7 @@ namespace utility {
 		expires_ = 0;
 	}
 
-	Timer::~Timer()
+	TimerTask::~TimerTask()
 	{
 		if (timer_notify_ != NULL)
 		{
@@ -191,51 +191,37 @@ namespace utility {
 		}
 	}
 
-	int Timer::StartTimer(TimerNotify* timer_notify, unsigned interval, TimerType timeType)
+	void TimerTask::SetTimerTask(TimerNotify* timer_notify, unsigned interval, TimerType timeType)
 	{
-		StopTimer();
 		interval_time_ = interval;
 		expires_ = interval_time_ + sys_time_.GetCurrentMilliseconds();
 		timer_notify_ = timer_notify;
-		timer_manager_.AddTimer(this);
-		return TRUE;
 	}
 
-	int Timer::StopTimer()
-	{
-		if (vect_index_ != -1)
-		{
-			timer_manager_.RemoveTimer(this);
-			vect_index_ = -1;
-		}
-		return 0;
-	}
-
-	unsigned long long Timer::GetExpiredTime()
+	unsigned long long TimerTask::GetExpiredTime()
 	{
 		return expires_;
 	}
-	void Timer::SetVectorIndex(int vect_index)
+	void TimerTask::SetVectorIndex(int vect_index)
 	{
 		vect_index_ = vect_index;
 	}
 
-	int Timer::GetVectorIndex(void)
+	int TimerTask::GetVectorIndex(void)
 	{
 		return vect_index_;
 	}
 
-	void Timer::HandleTask(unsigned long long current_time)
+	void TimerTask::HandleTask(unsigned long long current_time)
 	{
 		
 		if (timer_type_ == CIRCLE)
 		{
 			expires_ = interval_time_ + current_time;
-			timer_manager_.AddTimer(this);
 		}
 		else
 		{
-			vect_index_ = 0;
+			vect_index_ = -1;
 		}
 
 		if (timer_notify_ != NULL)
@@ -255,34 +241,33 @@ namespace utility {
 
 	}
 
-	void TimerManager::AddTimer(Timer* timer)
+	void TimerManager::AddTimer(TimerTask* timer_task)
 	{
-		unsigned long long expires = timer->GetExpiredTime();
-		unsigned long long idx = expires - check_time_;
-
+		unsigned long long expires = timer_task->GetExpiredTime()/500;
+		unsigned long long idx = expires - check_time_/500;
 		if (idx < WHEEL_SIZE1)
 		{
-			timer->SetVectorIndex(expires & WHEEL_MASK1);
+			timer_task->SetVectorIndex(expires & WHEEL_MASK1);
 		}
 		else if (idx < (unsigned long long)1 << (WHEEL_BIT1 + WHEEL_BIT2))
 		{
-			timer->SetVectorIndex(OFFSET(0) + INDEX(expires, 0));
+			timer_task->SetVectorIndex(OFFSET(0) + INDEX(expires, 0));
 		}
 		else if (idx < (unsigned long long)1 << (WHEEL_BIT1 + 2 * WHEEL_BIT2))
 		{
-			timer->SetVectorIndex(OFFSET(1) + INDEX(expires, 1));
+			timer_task->SetVectorIndex(OFFSET(1) + INDEX(expires, 1));
 		}
 		else if (idx < (unsigned long long)1 << (WHEEL_BIT1 + 3 * WHEEL_BIT2))
 		{
-			timer->SetVectorIndex(OFFSET(2) + INDEX(expires, 2));
+			timer_task->SetVectorIndex(OFFSET(2) + INDEX(expires, 2));
 		}
 		else if (idx < (unsigned long long)1 << (WHEEL_BIT1 + 4 * WHEEL_BIT2))
 		{
-			timer->SetVectorIndex(OFFSET(3) + INDEX(expires, 3));
+			timer_task->SetVectorIndex(OFFSET(3) + INDEX(expires, 3));
 		}
 		else if ((long long)idx < 0)
 		{
-			timer->SetVectorIndex(check_time_ & WHEEL_MASK1);
+			timer_task->SetVectorIndex(check_time_ & WHEEL_MASK1);
 		}
 		else
 		{
@@ -291,19 +276,19 @@ namespace utility {
 				idx = 0xffffffffUL;
 				expires = idx + check_time_;
 			}
-			timer->SetVectorIndex(OFFSET(3) + INDEX(expires, 3));
+			timer_task->SetVectorIndex(OFFSET(3) + INDEX(expires, 3));
 		}
 
-		TIMER_LIST& tlist = timer_wheel_[timer->GetVectorIndex()];
-		tlist.push_back(timer);
-		timer->itr_ = tlist.end();
-		--timer->itr_;
+		TIMER_LIST& tlist = timer_wheel_[timer_task->GetVectorIndex()];
+		tlist.push_back(timer_task);
+		timer_task->itr_ = tlist.end();
+		--timer_task->itr_;
 	}
 
-	void TimerManager::RemoveTimer(Timer* timer)
+	void TimerManager::RemoveTimer(TimerTask* timer_task)
 	{
-		TIMER_LIST& tlist = timer_wheel_[timer->GetVectorIndex()];
-		tlist.erase(timer->itr_);
+		TIMER_LIST& tlist = timer_wheel_[timer_task->GetVectorIndex()];
+		tlist.erase(timer_task->itr_);
 	}
 
 	void TimerManager::DetectTimers()
@@ -319,7 +304,8 @@ namespace utility {
 			{
 				Cascade(OFFSET(3), INDEX(check_time_, 3));
 			}
-			++check_time_;
+			Sleep(500);
+			check_time_ +=500;
 
 			TIMER_LIST& tlist = timer_wheel_[index];
 			TIMER_LIST temp;
@@ -327,6 +313,10 @@ namespace utility {
 			for (TIMER_LIST::iterator itr = temp.begin(); itr != temp.end(); ++itr)
 			{
 				(*itr)->HandleTask(now);
+				if ((*itr)->GetVectorIndex() != -1)
+				{
+					AddTimer(*itr);
+				}
 			}
 		}
 	}
@@ -343,5 +333,73 @@ namespace utility {
 		}
 
 		return index;
+	}
+
+	TimerThread::TimerThread() 
+	{
+		exit_flag_ = FALSE;
+		task_list_.clear();
+	}
+
+	TimerThread::~TimerThread()
+	{
+		task_list_.clear();
+	}
+
+	void TimerThread::ThreadWorkFunc(THREAD_PARAMETERS* work_para)
+	{
+		while (!exit_flag_)
+		{
+			if (task_list_.size() == 0)
+			{
+				comm_event_.WaitForEventSignaled();
+			}
+			comm_event_.ResetEvent();
+			timer_manager_.DetectTimers();
+		}
+	}
+
+	TimerTask* TimerThread::SetATimer(TimerNotify* timer_notify, int interval_time, TimerType timeType)
+	{
+		TimerTask* timer_task = new TimerTask();
+		if (timer_task == NULL)
+		{
+			return NULL;
+		}
+		timer_task->SetTimerTask(timer_notify, interval_time, timeType);
+		timer_manager_.AddTimer(timer_task);
+		task_list_.push_back(timer_task);
+		comm_event_.SetEvent();
+		return timer_task;
+	}
+
+	void TimerThread::StopATimer(TimerTask* timer_task)
+	{
+		timer_manager_.RemoveTimer(timer_task);
+		task_list_.remove(timer_task);
+
+		if (timer_task != NULL)
+		{
+			delete timer_task;
+		}
+	}
+
+	BOOL TimerThread::StartTimerThread()
+	{
+		return CreateThread();
+	}
+	
+	void TimerThread::StopTimerThread()
+	{
+		exit_flag_ = TRUE;
+		DestroyThreads();
+	}
+	void TimerThread::OnBeforeThreadExiting()
+	{
+		while (task_list_.size() > 0)
+		{
+			TimerTask* tmp_task = task_list_.front();
+			StopATimer(tmp_task);
+		}
 	}
 }

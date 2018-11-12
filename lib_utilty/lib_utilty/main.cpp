@@ -93,6 +93,16 @@ public:
 	void OnTimerNotify() { std::cout << "OnTimerNotify" << std::endl; }
 };
 
+
+class OnNotify2 : public utility::TimerNotify
+{
+public:
+	OnNotify2() {}
+	~OnNotify2() {}
+
+	void OnTimerNotify() { std::cout << "OnTimerNotify2" << std::endl; }
+};
+
 void TimerHandler()
 {
 	std::cout << "TimerHandler" << std::endl;
@@ -100,22 +110,40 @@ void TimerHandler()
 
 int main()
 {
-	utility::TimerManager tm;
-	utility::Timer t(tm);
+	utility::TimerTask* task1 = NULL;
+	utility::TimerTask* task2 = NULL;
 	utility::TimerNotify* timer_notify = new OnNotify();
-	t.StartTimer(timer_notify, 3000);
+	utility::TimerNotify* timer_notify2 = new OnNotify2();
+	utility::TimerThread timer_thread;
+	
+	
+	timer_thread.StartTimerThread();
+	//task1 = timer_thread.SetATimer(timer_notify, 2000);
+	//t.StartTimer(timer_notify, 3000);
 
-	while (true)
-	{
+	//while (true)
+	//{
 		//unsigned long long start = time.GetCurrentMilliseconds();
 		//unsigned long long start = tm.GetCurrentMillisecs();
-		tm.DetectTimers();
+		//tm.DetectTimers();
 		//std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 		//unsigned long long end = time.GetCurrentMilliseconds();
 		//unsigned long long end = tm.GetCurrentMillisecs();
 		//std::cout << "time:" << end - start << std::endl;
-	}
+	//}
+	//utility::SystemTime sys_time;
+	//unsigned long long start = sys_time.GetCurrentMilliseconds();
+	//Sleep(1);
 
+	//unsigned long long end = sys_time.GetCurrentMilliseconds();
+	//std::cout << "start=" << start << std::endl;
+	//std::cout << "end=" << end << std::endl;
+	//std::cout << "end - start =" << end - start << std::endl;
 	std::cin.get();
+	task2 = timer_thread.SetATimer(timer_notify2, 2000);
+	std::cin.get();
+	timer_thread.StopATimer(task2);
+	std::cin.get();
+	timer_thread.StopTimerThread();
 	return 0;
 }

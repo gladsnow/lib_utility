@@ -90,7 +90,7 @@ public:
 	}THREAD_PARAMETERS;
 
 	virtual void ThreadWorkFunc(THREAD_PARAMETERS* work_para) = 0;
-	void OnBeforeThreadExiting() {};
+	virtual void OnBeforeThreadExiting() {};
 
 	BOOL CreateThread(int thread_count = DEFAULT_THREAD_COUNT)
 	{
@@ -135,7 +135,6 @@ public:
 		}
 	}
 
-private:
 	void DestroyThreads()
 	{
 		OnBeforeThreadExiting();
@@ -166,6 +165,7 @@ private:
 		}
 	}
 
+private:
 	void WaitThreadsExit()
 	{
 		WaitForMultipleObjects(thread_count_, thread_handle_, TRUE, INFINITE);
@@ -342,8 +342,7 @@ public:
 	
 };
 
-#define GRANULARITY 10 //10ms
-//#define TIMER_WHEEL_NUM 5 //5级时间轮
+#define WHEEL_SCALE 100 //第一级时间轮的一格是100ms
 #define WHEEL_BIT1	8	
 #define WHEEL_BIT2	6
 #define WHEEL_SIZE1 (1 << WHEEL_BIT1)	//第1级时间轮的格数
@@ -355,30 +354,28 @@ public:
 
 class TimerManager;
 
-class Timer
+enum TimerType { ONCE, CIRCLE };
+
+class TimerTask
 {
 public:
-	enum TimerType { ONCE, CIRCLE };
 
-	Timer(TimerManager& manager);
-	~Timer();
-	int StartTimer(TimerNotify* timer_notify, unsigned interval, TimerType timeType = CIRCLE);
-	int StopTimer();
+	TimerTask();
+	~TimerTask();
+	void SetTimerTask(TimerNotify* timer_notify, unsigned interval, TimerType timeType = CIRCLE);
 
 	unsigned long long GetExpiredTime();
 	void SetVectorIndex(int vect_index);
 	int GetVectorIndex(void);
-
-	std::list<Timer*>::iterator itr_;
 	void HandleTask(unsigned long long current_time);
 
+	std::list<TimerTask*>::iterator itr_;
 private:
 	unsigned interval_time_;
 	unsigned long long expires_;
 	int vect_index_;
 	TimerNotify* timer_notify_;
 	TimerType timer_type_;
-	TimerManager& timer_manager_;
 	utility::SystemTime sys_time_;
 
 };
@@ -389,27 +386,39 @@ public:
 	TimerManager();
 	~TimerManager();
 
-	void AddTimer(Timer* timer);
-	void RemoveTimer(Timer* timer);
+	void AddTimer(TimerTask* timer);
+	void RemoveTimer(TimerTask* timer);
 	int Cascade(int offset, int index);
 	void DetectTimers(void);
 private:
-	typedef std::list<Timer*> TIMER_LIST;
+	typedef std::list<TimerTask*> TIMER_LIST;
 	std::vector<TIMER_LIST> timer_wheel_;
 	utility::SystemTime sys_time_;
 	unsigned long long check_time_;
 };
 
-//
-//class TimerThread: utility::MultiThreads<TimerThread,1>
-//{
-//public:
-//	TimerThread() {};
-//	~TimerThread() {};
-//
-//private:
-//
-//};
+
+class TimerThread: public utility::MultiThreads<TimerThread,1>
+{
+public:
+	TimerThread();
+	~TimerThread();
+	 
+	void ThreadWorkFunc(THREAD_PARAMETERS* work_para);
+	void OnBeforeThreadExiting();
+
+	BOOL StartTimerThread();
+	void StopTimerThread();
+
+	TimerTask* SetATimer(TimerNotify* timer_notify, int interval_time, TimerType timeType = CIRCLE);
+	void StopATimer(TimerTask* timer_task);
+	
+private:
+	TimerManager timer_manager_;
+	std::list<TimerTask*> task_list_;
+	BOOL exit_flag_;
+	utility::CommonEvent comm_event_;
+};
 
 }
 #endif //_LIB_UTILITY_H_
