@@ -90,7 +90,7 @@ public:
 	OnNotify(){}
 	~OnNotify() {}
 
-	void OnTimerNotify() { std::cout << "OnTimerNotify" << std::endl; }
+	void OnTimerNotify() { std::cout << ">>>>>>>>>>>>>>>>>>OnTimerNotify" << std::endl; }
 };
 
 
@@ -100,7 +100,15 @@ public:
 	OnNotify2() {}
 	~OnNotify2() {}
 
-	void OnTimerNotify() { std::cout << "OnTimerNotify2" << std::endl; }
+	void OnTimerNotify() { std::cout << ">>>>>>>>>>>>>>>>OnTimerNotify2" << std::endl; }
+};
+class OnNotify3 : public utility::TimerNotify
+{
+public:
+	OnNotify3() {}
+	~OnNotify3() {}
+
+	void OnTimerNotify() { std::cout << "OnTimerNotify3" << std::endl; }
 };
 
 void TimerHandler()
@@ -112,13 +120,17 @@ int main()
 {
 	utility::TimerTask* task1 = NULL;
 	utility::TimerTask* task2 = NULL;
+	utility::TimerTask* task3 = NULL;
 	utility::TimerNotify* timer_notify = new OnNotify();
 	utility::TimerNotify* timer_notify2 = new OnNotify2();
+	utility::TimerNotify* timer_notify3 = new OnNotify3();
 	utility::TimerThread timer_thread;
 	
 	
 	timer_thread.StartTimerThread();
-	//task1 = timer_thread.SetATimer(timer_notify, 2000);
+	task1 = timer_thread.SetATimer(timer_notify, 2000);
+	task2 = timer_thread.SetATimer(timer_notify2, 4200);
+	task3 = timer_thread.SetATimer(timer_notify3, 3000,utility::ONCE);
 	//t.StartTimer(timer_notify, 3000);
 
 	//while (true)
@@ -139,11 +151,14 @@ int main()
 	//std::cout << "start=" << start << std::endl;
 	//std::cout << "end=" << end << std::endl;
 	//std::cout << "end - start =" << end - start << std::endl;
+	//std::cin.get();
+	
 	std::cin.get();
-	task2 = timer_thread.SetATimer(timer_notify2, 2000);
-	std::cin.get();
+	timer_thread.StopATimer(task1);
 	timer_thread.StopATimer(task2);
+	std::cout << "stop Timer" << std::endl;
 	std::cin.get();
+	std::cout << "stop Thread" << std::endl;
 	timer_thread.StopTimerThread();
 	return 0;
 }

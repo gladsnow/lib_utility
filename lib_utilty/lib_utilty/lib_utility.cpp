@@ -180,7 +180,6 @@ namespace utility {
 		vect_index_ = -1;
 		timer_notify_ = NULL;
 		timer_type_ = CIRCLE;
-		expires_ = 0;
 	}
 
 	TimerTask::~TimerTask()
@@ -191,16 +190,16 @@ namespace utility {
 		}
 	}
 
-	void TimerTask::SetTimerTask(TimerNotify* timer_notify, unsigned interval, TimerType timeType)
+	void TimerTask::SetTimerTask(TimerNotify* timer_notify, unsigned interval, TimerType timer_type)
 	{
 		interval_time_ = interval;
-		expires_ = interval_time_ + sys_time_.GetCurrentMilliseconds();
 		timer_notify_ = timer_notify;
+		timer_type_ = timer_type;
 	}
 
-	unsigned long long TimerTask::GetExpiredTime()
+	unsigned TimerTask::GetIntervalTime()
 	{
-		return expires_;
+		return interval_time_;
 	}
 	void TimerTask::SetVectorIndex(int vect_index)
 	{
@@ -212,14 +211,10 @@ namespace utility {
 		return vect_index_;
 	}
 
-	void TimerTask::HandleTask(unsigned long long current_time)
+	void TimerTask::HandleTask()
 	{
 		
-		if (timer_type_ == CIRCLE)
-		{
-			expires_ = interval_time_ + current_time;
-		}
-		else
+		if (timer_type_ != CIRCLE)
 		{
 			vect_index_ = -1;
 		}
@@ -233,7 +228,7 @@ namespace utility {
 	TimerManager::TimerManager()
 	{
 		timer_wheel_.resize(WHEEL_SIZE1 + 4 * WHEEL_SIZE2);
-		check_time_ = sys_time_.GetCurrentMilliseconds();
+		current_pos_ = 0;
 	}
 
 	TimerManager::~TimerManager()
@@ -243,41 +238,32 @@ namespace utility {
 
 	void TimerManager::AddTimer(TimerTask* timer_task)
 	{
-		unsigned long long expires = timer_task->GetExpiredTime()/500;
-		unsigned long long idx = expires - check_time_/500;
-		if (idx < WHEEL_SIZE1)
+		unsigned long long interval_time = timer_task->GetIntervalTime();
+		unsigned long long tmp_interval = interval_time /WHEEL_SCALE;
+		int vect_index = 0;
+
+		if (tmp_interval < WHEEL_SIZE1)
 		{
-			timer_task->SetVectorIndex(expires & WHEEL_MASK1);
+			vect_index = (tmp_interval + current_pos_) % WHEEL_SIZE1;
 		}
-		else if (idx < (unsigned long long)1 << (WHEEL_BIT1 + WHEEL_BIT2))
+		else if (tmp_interval < ((unsigned)1 << (WHEEL_BIT1 + WHEEL_BIT2)))
 		{
-			timer_task->SetVectorIndex(OFFSET(0) + INDEX(expires, 0));
+			vect_index = INDEX(tmp_interval + current_pos_, 0) % WHEEL_SIZE2 + OFFSET(0);
 		}
-		else if (idx < (unsigned long long)1 << (WHEEL_BIT1 + 2 * WHEEL_BIT2))
+		else if (tmp_interval < ((unsigned)1 << (WHEEL_BIT1 + 2 * WHEEL_BIT2)))
 		{
-			timer_task->SetVectorIndex(OFFSET(1) + INDEX(expires, 1));
+			vect_index = INDEX(tmp_interval + current_pos_, 1) % WHEEL_SIZE2 + OFFSET(1);
 		}
-		else if (idx < (unsigned long long)1 << (WHEEL_BIT1 + 3 * WHEEL_BIT2))
+		else if (tmp_interval < ((unsigned)1 << (WHEEL_BIT1 + 3 * WHEEL_BIT2)))
 		{
-			timer_task->SetVectorIndex(OFFSET(2) + INDEX(expires, 2));
+			vect_index = INDEX(tmp_interval + current_pos_, 2) % WHEEL_SIZE2 + OFFSET(2);
 		}
-		else if (idx < (unsigned long long)1 << (WHEEL_BIT1 + 4 * WHEEL_BIT2))
+		else if (tmp_interval < ((unsigned long long)1 << (WHEEL_BIT1 + 4 * WHEEL_BIT2)))
 		{
-			timer_task->SetVectorIndex(OFFSET(3) + INDEX(expires, 3));
+			vect_index = INDEX(tmp_interval + current_pos_, 3) % WHEEL_SIZE2 + OFFSET(3);
 		}
-		else if ((long long)idx < 0)
-		{
-			timer_task->SetVectorIndex(check_time_ & WHEEL_MASK1);
-		}
-		else
-		{
-			if (idx > 0xffffffffUL)
-			{
-				idx = 0xffffffffUL;
-				expires = idx + check_time_;
-			}
-			timer_task->SetVectorIndex(OFFSET(3) + INDEX(expires, 3));
-		}
+
+		timer_task->SetVectorIndex(vect_index);
 
 		TIMER_LIST& tlist = timer_wheel_[timer_task->GetVectorIndex()];
 		tlist.push_back(timer_task);
@@ -293,31 +279,35 @@ namespace utility {
 
 	void TimerManager::DetectTimers()
 	{
-		unsigned long long now = sys_time_.GetCurrentMilliseconds();
-		while (check_time_ <= now)
+		if (current_pos_ < 0xffffffffUL)
 		{
-			int index = check_time_ & WHEEL_MASK1;
+			int index = (current_pos_) % WHEEL_SIZE1;
 			if (!index &&
-				!Cascade(OFFSET(0), INDEX(check_time_, 0)) &&
-				!Cascade(OFFSET(1), INDEX(check_time_, 1)) &&
-				!Cascade(OFFSET(2), INDEX(check_time_, 2)))
+				!Cascade(OFFSET(0), INDEX(current_pos_ , 0)) &&
+				!Cascade(OFFSET(1), INDEX(current_pos_, 1)) &&
+				!Cascade(OFFSET(2), INDEX(current_pos_, 2)))
 			{
-				Cascade(OFFSET(3), INDEX(check_time_, 3));
+				Cascade(OFFSET(3), INDEX(current_pos_ , 3));
 			}
-			Sleep(500);
-			check_time_ +=500;
+
+			Sleep(WHEEL_SCALE);
 
 			TIMER_LIST& tlist = timer_wheel_[index];
 			TIMER_LIST temp;
 			temp.splice(temp.end(), tlist);
 			for (TIMER_LIST::iterator itr = temp.begin(); itr != temp.end(); ++itr)
 			{
-				(*itr)->HandleTask(now);
+				(*itr)->HandleTask();
 				if ((*itr)->GetVectorIndex() != -1)
 				{
 					AddTimer(*itr);
 				}
 			}
+			current_pos_ += 1;
+		}
+		else
+		{
+			current_pos_ = 0;
 		}
 	}
 
@@ -352,15 +342,19 @@ namespace utility {
 		{
 			if (task_list_.size() == 0)
 			{
+				comm_event_.ResetEvent();
 				comm_event_.WaitForEventSignaled();
 			}
-			comm_event_.ResetEvent();
 			timer_manager_.DetectTimers();
 		}
 	}
 
-	TimerTask* TimerThread::SetATimer(TimerNotify* timer_notify, int interval_time, TimerType timeType)
+	TimerTask* TimerThread::SetATimer(TimerNotify* timer_notify, unsigned interval_time, TimerType timeType)
 	{
+		if (interval_time >= 0xFFFFFFFFUL)
+		{
+			return NULL;
+		}
 		TimerTask* timer_task = new TimerTask();
 		if (timer_task == NULL)
 		{
